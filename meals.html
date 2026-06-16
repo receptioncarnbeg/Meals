@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Meals Attendance</title>
+<style>
+  :root{
+    --bg:#F4F2EC;--surface:#FFFFFF;--surface-2:#FBFAF6;--ink:#1E2A2E;--ink-soft:#5A6B70;
+    --line:#E3DFD4;--go:#23795A;--go-soft:#E7F1EC;--go-ink:#155C42;
+    --amber:#B5791F;--amber-soft:#F6ECD8;--warn:#A8442F;--warn-soft:#F6E4DE;--focus:#2E6F9E;
+    --radius:18px;--tap:64px;--shadow:0 1px 2px rgba(30,42,46,.06),0 6px 20px rgba(30,42,46,.06);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:18px;line-height:1.4;-webkit-font-smoothing:antialiased;}
+  .app{max-width:760px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;}
+
+  header{position:sticky;top:0;z-index:20;background:var(--surface);border-bottom:1px solid var(--line);padding:14px 16px 12px;}
+  .top-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .brand{display:flex;flex-direction:column;min-width:0;gap:3px;}
+  .brand h1{margin:0;font-size:18px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .brand .date{font-size:14px;color:var(--ink-soft);font-variant-numeric:tabular-nums;}
+  .pill{font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;width:max-content;cursor:default;}
+  .pill .dot{width:8px;height:8px;border-radius:50%;background:currentColor;}
+  .pill.synced{background:var(--go-soft);color:var(--go-ink);}
+  .pill.saving{background:var(--amber-soft);color:var(--amber);}
+  .pill.offline{background:var(--surface-2);color:var(--ink-soft);}
+  .pill.error{background:var(--warn-soft);color:var(--warn);}
+  .pill.off{background:var(--surface-2);color:var(--ink-soft);}
+  .count{display:flex;flex-direction:column;align-items:flex-end;line-height:1;padding:6px 14px;border-radius:14px;background:var(--go-soft);min-width:96px;}
+  .count .num{font-size:38px;font-weight:800;color:var(--go-ink);font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
+  .count .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--go-ink);font-weight:700;opacity:.8;}
+
+  .session{display:flex;gap:8px;margin-top:12px;}
+  .seg{flex:1;min-height:52px;border:1.5px solid var(--line);background:var(--surface-2);border-radius:14px;font-size:16px;font-weight:700;color:var(--ink-soft);display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:background .12s,border-color .12s,color .12s;}
+  .seg[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff;}
+
+  .searchwrap{position:sticky;top:0;padding:12px 16px 8px;background:var(--bg);z-index:10;}
+  .search{width:100%;min-height:52px;border:1.5px solid var(--line);border-radius:14px;background:var(--surface);padding:0 16px;font-size:18px;color:var(--ink);}
+  .search::placeholder{color:#9AA6A9;}
+  .search:focus{outline:3px solid var(--focus);outline-offset:1px;border-color:var(--focus);}
+
+  .list{padding:0 16px 140px;display:flex;flex-direction:column;gap:8px;}
+  .row{display:flex;align-items:center;gap:14px;min-height:var(--tap);background:var(--surface);border:1.5px solid var(--line);border-radius:var(--radius);padding:10px 14px;cursor:pointer;user-select:none;transition:background .12s,border-color .12s,transform .06s;}
+  .row:active{transform:scale(.992);}
+  .row .room{flex:0 0 auto;min-width:58px;height:46px;padding:0 12px;border-radius:11px;background:var(--surface-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .row .who{flex:1;min-width:0;}
+  .row .who .name{font-size:18px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row .who .tag{font-size:12px;color:var(--amber);font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+  .row .mark{flex:0 0 auto;width:40px;height:40px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;color:transparent;transition:all .12s;}
+  .row.on{background:var(--go-soft);border-color:var(--go);}
+  .row.on .room{background:#fff;border-color:var(--go);color:var(--go-ink);}
+  .row.on .mark{background:var(--go);border-color:var(--go);color:#fff;}
+  .row.on .who .name{color:var(--go-ink);}
+  .mark svg{width:22px;height:22px;}
+
+  .empty{text-align:center;color:var(--ink-soft);padding:48px 24px;background:var(--surface);border:1.5px dashed var(--line);border-radius:var(--radius);}
+  .empty strong{display:block;color:var(--ink);font-size:18px;margin-bottom:6px;}
+  .nores{text-align:center;color:var(--ink-soft);padding:24px;}
+
+  .fabs{position:fixed;left:0;right:0;bottom:0;z-index:30;pointer-events:none;}
+  .fabs-inner{max-width:760px;margin:0 auto;padding:12px 16px calc(12px + env(safe-area-inset-bottom));display:flex;gap:10px;background:linear-gradient(to top,var(--bg) 60%,transparent);}
+  .btn{pointer-events:auto;min-height:56px;border-radius:16px;border:none;font-size:17px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;}
+  .btn-primary{flex:1;background:var(--go);color:#fff;box-shadow:var(--shadow);}
+  .btn-primary:active{background:var(--go-ink);}
+  .btn-ghost{flex:0 0 auto;padding:0 18px;background:var(--surface);color:var(--ink);border:1.5px solid var(--line);}
+  .btn-ghost:active{background:var(--surface-2);}
+
+  .scrim{position:fixed;inset:0;background:rgba(20,28,30,.45);z-index:50;display:none;align-items:flex-end;justify-content:center;}
+  .scrim.show{display:flex;}
+  .sheet{width:100%;max-width:760px;max-height:92vh;overflow:auto;background:var(--bg);border-radius:22px 22px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom));}
+  .sheet h2{margin:4px 0 14px;font-size:20px;}
+  .sheet h3{margin:22px 0 8px;font-size:15px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;}
+  .x{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);font-size:20px;cursor:pointer;color:var(--ink-soft);}
+  .field{display:block;margin:10px 0;}
+  .field label{display:block;font-size:13px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em;}
+  .field input,.field textarea{width:100%;min-height:52px;border:1.5px solid var(--line);border-radius:12px;background:var(--surface);padding:12px 14px;font-size:17px;color:var(--ink);font-family:inherit;}
+  .field textarea{min-height:140px;resize:vertical;line-height:1.5;}
+  .field input:focus,.field textarea:focus{outline:3px solid var(--focus);outline-offset:1px;border-color:var(--focus);}
+  .hint{font-size:13px;color:var(--ink-soft);margin:4px 2px 0;}
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+  .actions .btn,.actions>button{flex:1;min-width:140px;}
+  .btn-line{background:var(--surface);border:1.5px solid var(--line);color:var(--ink);min-height:52px;border-radius:13px;font-size:16px;font-weight:700;cursor:pointer;}
+  .btn-solid{background:var(--ink);color:#fff;min-height:52px;border-radius:13px;border:none;font-size:16px;font-weight:700;cursor:pointer;}
+  .btn-warn{background:var(--warn-soft);color:var(--warn);border:1.5px solid #E7C3B8;min-height:52px;border-radius:13px;font-size:16px;font-weight:700;cursor:pointer;}
+
+  .tabs{display:flex;gap:6px;background:var(--surface-2);padding:5px;border-radius:14px;margin-bottom:6px;}
+  .tab{flex:1;min-height:46px;border:none;background:transparent;border-radius:10px;font-size:15px;font-weight:700;color:var(--ink-soft);cursor:pointer;}
+  .tab.active{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);}
+
+  .mini{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:7px;}
+  .mini .room{font-weight:800;min-width:48px;font-variant-numeric:tabular-nums;}
+  .mini .name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mini button{border:none;background:transparent;font-size:14px;font-weight:700;cursor:pointer;padding:8px;border-radius:8px;}
+  .mini .edit{color:var(--focus);}.mini .del{color:var(--warn);}
+
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 4px;}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;}
+  .stat .v{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;}
+  .stat .k{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);font-weight:700;}
+  .day-row{display:flex;justify-content:space-between;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:11px;margin-bottom:6px;font-variant-numeric:tabular-nums;}
+  .day-row .d{font-weight:700;}.day-row .n{color:var(--ink-soft);}
+
+  .gear{width:44px;height:44px;border-radius:50%;border:1.5px solid var(--line);background:var(--surface);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .gear svg{width:22px;height:22px;color:var(--ink-soft);}
+  .note{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--ink-soft);margin:8px 0;}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+  @media (max-width:420px){.count .num{font-size:32px;}.brand h1{font-size:16px;}.seg{font-size:14px;}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="top-row">
+      <div class="brand">
+        <h1 id="centreName">Meals Attendance</h1>
+        <span class="date" id="todayLabel"></span>
+        <span class="pill off" id="syncPill"><span class="dot"></span><span id="syncText">Local only</span></span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="count" id="countBox">
+          <span class="num" id="countNum">0</span>
+          <span class="lbl" id="countLbl">present</span>
+        </div>
+        <button class="gear" id="adminBtn" aria-label="Settings and records">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="session">
+      <button class="seg" id="segB" aria-pressed="false">Breakfast</button>
+      <button class="seg" id="segL" aria-pressed="false">Lunch</button>
+      <button class="seg" id="segD" aria-pressed="false">Dinner</button>
+    </div>
+  </header>
+
+  <div class="searchwrap">
+    <input class="search" id="search" inputmode="search" placeholder="Search room number or name…" autocomplete="off">
+  </div>
+
+  <div class="list" id="list"></div>
+</div>
+
+<div class="fabs">
+  <div class="fabs-inner">
+    <button class="btn btn-primary" id="addRiderBtn">+ Add person not on list</button>
+    <button class="btn btn-ghost" id="clearSearchBtn" style="display:none;">Clear</button>
+  </div>
+</div>
+
+<div class="scrim" id="riderScrim">
+  <div class="sheet">
+    <div class="sheet-head"><h2>Add person not on list</h2><button class="x" data-close>✕</button></div>
+    <p class="hint">For someone not yet on the list — recorded for this meal and synced like any other tick.</p>
+    <div class="field"><label>Room number</label><input id="riderRoom" inputmode="text" placeholder="e.g. 214"></div>
+    <div class="field"><label>Name (optional)</label><input id="riderName" placeholder="Leave blank if not known"></div>
+    <div class="actions">
+      <button class="btn-line" data-close>Cancel</button>
+      <button class="btn-solid" id="riderSave">Add &amp; mark present</button>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="adminScrim">
+  <div class="sheet">
+    <div class="sheet-head"><h2 id="adminTitle">Admin</h2><button class="x" data-close>✕</button></div>
+
+    <div id="pinGate">
+      <p class="hint">Enter the staff PIN to manage settings and records.</p>
+      <div class="field"><label>Staff PIN</label><input id="pinInput" inputmode="numeric" type="password" placeholder="••••"></div>
+      <div id="pinError" class="hint" style="color:var(--warn);display:none;">Incorrect PIN.</div>
+      <div class="actions"><button class="btn-solid" id="pinSubmit">Unlock</button></div>
+      <p class="hint" style="margin-top:14px;">Default PIN is <strong>1379</strong> — change it under Settings.</p>
+    </div>
+
+    <div id="adminPanels" style="display:none;">
+      <div class="tabs">
+        <button class="tab active" data-tab="residents">Residents</button>
+        <button class="tab" data-tab="records">Records</button>
+        <button class="tab" data-tab="settings">Settings</button>
+      </div>
+
+      <section data-panel="residents">
+        <div class="note" id="cloudNote" style="display:none;">Cloud sync is on. The master list is the <strong>Residents</strong> tab of your Google Sheet — edit it there and it updates here. The list below is the last copy pulled from the Sheet.</div>
+        <h3>Add a resident (local)</h3>
+        <div class="field"><label>Room number</label><input id="resRoom" placeholder="e.g. 118"></div>
+        <div class="field"><label>Name</label><input id="resName" placeholder="Full name"></div>
+        <div class="actions"><button class="btn-solid" id="resAdd">Add resident</button></div>
+
+        <h3>Paste a list</h3>
+        <p class="hint">One person per line as <strong>room, name</strong>.</p>
+        <div class="field"><textarea id="bulkText" placeholder="118, Amara Okafor&#10;214, Daniyar Toktarov&#10;77, Sofia Haddad"></textarea></div>
+        <div class="actions">
+          <button class="btn-line" id="bulkAdd">Add to list</button>
+          <button class="btn-warn" id="bulkReplace">Replace whole list</button>
+        </div>
+
+        <h3 style="margin-top:24px;">Current list (<span id="resCount">0</span>)</h3>
+        <div id="resList"></div>
+      </section>
+
+      <section data-panel="records" style="display:none;">
+        <div class="stat-grid">
+          <div class="stat"><div class="v" id="statToday">0</div><div class="k">Ticks today</div></div>
+          <div class="stat"><div class="v" id="statTotal">0</div><div class="k">Records on tablet</div></div>
+        </div>
+        <h3>Recent days (this tablet)</h3>
+        <div id="dayList"></div>
+        <h3 style="margin-top:22px;">Backup</h3>
+        <p class="hint">The Google Sheet is your live record. This CSV is an extra local backup if you want one.</p>
+        <div class="actions"><button class="btn-solid" id="exportBtn">⬇ Download CSV</button></div>
+        <h3 style="margin-top:22px;">Clear tablet records</h3>
+        <p class="hint">Removes the local copy on this tablet only — the Google Sheet is untouched.</p>
+        <div class="actions"><button class="btn-warn" id="clearLogBtn">Clear local records</button></div>
+      </section>
+
+      <section data-panel="settings" style="display:none;">
+        <div class="field"><label>Centre / service name</label><input id="setName" placeholder="e.g. Carnbeg Centre meals"></div>
+        <div class="field"><label>Staff PIN</label><input id="setPin" inputmode="numeric" placeholder="4 digits"></div>
+
+        <h3>Cloud sync (Google Sheet)</h3>
+        <p class="hint">Paste the Web app URL from your meals Apps Script deployment and the same secret.</p>
+        <div class="field"><label>Web app URL</label><input id="setUrl" placeholder="https://script.google.com/macros/s/…/exec"></div>
+        <div class="field"><label>Shared secret</label><input id="setSecret" placeholder="must match the script"></div>
+        <div class="actions">
+          <button class="btn-line" id="testConn">Test connection</button>
+          <button class="btn-line" id="refreshRes">Refresh residents from Sheet</button>
+        </div>
+        <div id="syncMsg" class="hint"></div>
+
+        <div class="actions" style="margin-top:18px;"><button class="btn-solid" id="setSave">Save settings</button></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function(){
+  var K={res:"meals.residents",log:"meals.attendance",set:"meals.settings",queue:"meals.queue"};
+  function load(k,def){try{var v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch(e){return def;}}
+  function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){alert("Could not save locally. Storage may be full or blocked.");}}
+  var residents=load(K.res,[]);
+  var boardings=load(K.log,[]);
+  var queue=load(K.queue,[]);
+  var settings=load(K.set,{name:"Meals Attendance",pin:"1379",syncUrl:"",secret:""});
+  var SYNC={url:settings.syncUrl||"",secret:settings.secret||""};
+  function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
+
+  function todayKey(d){d=d||new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+  function prettyDate(d){d=d||new Date();return d.toLocaleDateString("en-GB",{weekday:"short",day:"numeric",month:"short",year:"numeric"});}
+  var H=(new Date()).getHours();
+  var meal=H<11?"Breakfast":(H<16?"Lunch":"Dinner");
+  var TODAY=todayKey();
+
+  var $=function(id){return document.getElementById(id);};
+  var listEl=$("list"),searchEl=$("search"),currentRows=[];
+
+  function rkey(r){
+    if(r.key) return r.key;
+    if(r.ref) return "ref:"+r.ref;
+    if(r.adhoc) return "ad:"+r.room+"~"+(r.name||"");
+    if(r.id) return "id:"+r.id;
+    return "rn:"+r.room+"~"+(r.name||"");
+  }
+  function eventIdFor(key){return TODAY+"|"+meal+"|"+key;}
+  function attendedSet(){var s={};boardings.forEach(function(b){if(b.date===TODAY&&b.meal===meal)s[b.key]=true;});return s;}
+  function countNow(){var n=0,s=attendedSet();for(var k in s)n++;return n;}
+
+  function toggle(r){
+    var key=rkey(r);
+    var idx=-1;
+    for(var i=0;i<boardings.length;i++){var b=boardings[i];if(b.date===TODAY&&b.meal===meal&&b.key===key){idx=i;break;}}
+    if(idx>=0){
+      boardings.splice(idx,1);save(K.log,boardings);
+      enqueue({action:"unboard",eventId:eventIdFor(key),key:key,date:TODAY,meal:meal,room:r.room,name:r.name||"",adhoc:!!r.adhoc});
+    }else{
+      var rec={key:key,date:TODAY,meal:meal,room:r.room,name:r.name||"",ts:new Date().toISOString(),adhoc:!!r.adhoc};
+      boardings.push(rec);save(K.log,boardings);
+      enqueue({action:"board",eventId:eventIdFor(key),key:key,date:TODAY,meal:meal,room:r.room,name:r.name||"",adhoc:!!r.adhoc,timestamp:rec.ts});
+    }
+    render();
+  }
+
+  function setSync(state,extra){
+    var pill=$("syncPill"),txt=$("syncText");
+    pill.className="pill "+state;
+    var map={synced:"Synced",saving:"Saving"+(queue.length?" "+queue.length:"")+"…",offline:"Offline"+(queue.length?" — "+queue.length+" queued":""),error:"Retrying"+(queue.length?" "+queue.length:"")+"…",off:"Local only"};
+    txt.textContent=extra||map[state]||state;
+  }
+  function enqueue(item){
+    queue=queue.filter(function(q){return q.eventId!==item.eventId;});
+    queue.push(item);save(K.queue,queue);flush();
+  }
+  var flushing=false;
+  function postAction(item){
+    var body=Object.assign({secret:SYNC.secret},item);
+    return fetch(SYNC.url,{method:"POST",body:JSON.stringify(body)}).then(function(r){return r.json();})
+      .then(function(res){if(res&&res.ok)return true;throw new Error((res&&res.error)||"server error");});
+  }
+  function flush(){
+    if(flushing)return;
+    if(!SYNC.url){setSync("off");return;}
+    if(!queue.length){setSync("synced");return;}
+    if(typeof navigator!=="undefined"&&navigator.onLine===false){setSync("offline");return;}
+    flushing=true;setSync("saving");
+    var item=queue[0];
+    postAction(item).then(function(){
+      if(queue[0]&&queue[0].eventId===item.eventId){queue.shift();save(K.queue,queue);}
+      flushing=false;
+      if(queue.length)flush();else setSync("synced");
+    }).catch(function(){flushing=false;setSync(navigator.onLine===false?"offline":"error");});
+  }
+  function fetchResidents(cb){
+    if(!SYNC.url){cb&&cb(false,"No sync URL set");return;}
+    var url=SYNC.url+(SYNC.url.indexOf("?")>=0?"&":"?")+"secret="+encodeURIComponent(SYNC.secret);
+    fetch(url).then(function(r){return r.json();}).then(function(res){
+      if(res&&res.ok&&Array.isArray(res.residents)){
+        residents=res.residents.map(function(x){return {room:String(x.room),name:x.name||"",ref:x.ref||""};});
+        save(K.res,residents);render();refreshAdmin();cb&&cb(true,res.residents.length+" residents loaded");
+      }else cb&&cb(false,(res&&res.error)||"Unexpected response");
+    }).catch(function(e){cb&&cb(false,"Could not reach the Sheet");});
+  }
+  if(typeof window!=="undefined"){window.addEventListener("online",flush);setInterval(flush,15000);}
+
+  function roomSort(a,b){
+    var na=parseInt(String(a.room).replace(/\D/g,""),10),nb=parseInt(String(b.room).replace(/\D/g,""),10);
+    if(!isNaN(na)&&!isNaN(nb)&&na!==nb)return na-nb;
+    return String(a.room).localeCompare(String(b.room),undefined,{numeric:true});
+  }
+  var CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  function render(){
+    $("centreName").textContent=settings.name||"Meals Attendance";
+    $("todayLabel").textContent=prettyDate()+" · "+meal;
+    $("segB").setAttribute("aria-pressed",meal==="Breakfast");
+    $("segL").setAttribute("aria-pressed",meal==="Lunch");
+    $("segD").setAttribute("aria-pressed",meal==="Dinner");
+    $("countNum").textContent=countNow();
+
+    var set=attendedSet();
+    var rows=residents.map(function(r){return {room:r.room,name:r.name,ref:r.ref,id:r.id,key:rkey(r)};});
+    var seen={};rows.forEach(function(r){seen[r.key]=true;});
+    boardings.forEach(function(b){
+      if(b.date===TODAY&&b.meal===meal&&b.adhoc&&!seen[b.key]){seen[b.key]=true;rows.push({room:b.room,name:b.name,adhoc:true,key:b.key});}
+    });
+    rows.sort(roomSort);
+
+    var q=searchEl.value.trim().toLowerCase();
+    if(q)rows=rows.filter(function(r){return String(r.room).toLowerCase().indexOf(q)>=0||String(r.name||"").toLowerCase().indexOf(q)>=0;});
+    $("clearSearchBtn").style.display=q?"flex":"none";
+    currentRows=rows;
+
+    if(residents.length===0&&rows.length===0){
+      listEl.innerHTML='<div class="empty"><strong>No residents loaded yet</strong>Set up cloud sync in Settings to pull the list from your Sheet, or add residents under the Residents tab.</div>';return;
+    }
+    if(rows.length===0){listEl.innerHTML='<div class="nores">No match for “'+escapeHtml(q)+'”.</div>';return;}
+
+    var html="";
+    rows.forEach(function(r){
+      var on=!!set[r.key];
+      html+='<div class="row'+(on?" on":"")+'" data-key="'+escapeHtml(r.key)+'">'
+        +'<div class="room">'+escapeHtml(String(r.room||"?"))+'</div>'
+        +'<div class="who"><div class="name">'+escapeHtml(r.name||"(no name)")+'</div>'
+        +(r.adhoc?'<div class="tag">added</div>':'')+'</div>'
+        +'<div class="mark">'+CHECK+'</div></div>';
+    });
+    listEl.innerHTML=html;
+  }
+  function escapeHtml(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+
+  listEl.addEventListener("click",function(e){
+    var row=e.target.closest(".row");if(!row)return;
+    var key=row.getAttribute("data-key");
+    for(var i=0;i<currentRows.length;i++){if(currentRows[i].key===key){toggle(currentRows[i]);return;}}
+  });
+
+  $("segB").onclick=function(){meal="Breakfast";render();};
+  $("segL").onclick=function(){meal="Lunch";render();};
+  $("segD").onclick=function(){meal="Dinner";render();};
+  searchEl.addEventListener("input",render);
+  $("clearSearchBtn").onclick=function(){searchEl.value="";render();searchEl.focus();};
+
+  var riderScrim=$("riderScrim");
+  $("addRiderBtn").onclick=function(){$("riderRoom").value="";$("riderName").value="";openSheet(riderScrim);setTimeout(function(){$("riderRoom").focus();},80);};
+  $("riderSave").onclick=function(){
+    var room=$("riderRoom").value.trim();if(!room){$("riderRoom").focus();return;}
+    var name=$("riderName").value.trim();
+    toggle({room:room,name:name,adhoc:true});
+    closeSheets();
+  };
+
+  var adminScrim=$("adminScrim"),unlocked=false;
+  $("adminBtn").onclick=function(){
+    openSheet(adminScrim);$("adminTitle").textContent="Admin";
+    $("pinGate").style.display=unlocked?"none":"block";
+    $("adminPanels").style.display=unlocked?"block":"none";
+    $("pinError").style.display="none";$("pinInput").value="";
+    if(unlocked)refreshAdmin();
+  };
+  $("pinSubmit").onclick=function(){
+    if($("pinInput").value===String(settings.pin)){unlocked=true;$("pinGate").style.display="none";$("adminPanels").style.display="block";refreshAdmin();}
+    else $("pinError").style.display="block";
+  };
+  $("pinInput").addEventListener("keydown",function(e){if(e.key==="Enter")$("pinSubmit").click();});
+
+  document.querySelectorAll(".tab").forEach(function(t){
+    t.onclick=function(){
+      document.querySelectorAll(".tab").forEach(function(x){x.classList.remove("active");});
+      t.classList.add("active");
+      var name=t.getAttribute("data-tab");
+      document.querySelectorAll("[data-panel]").forEach(function(p){p.style.display=p.getAttribute("data-panel")===name?"block":"none";});
+      refreshAdmin();
+    };
+  });
+
+  function refreshAdmin(){
+    $("cloudNote").style.display=SYNC.url?"block":"none";
+    var sorted=residents.slice().map(function(r){return {room:r.room,name:r.name,id:r.id,ref:r.ref,key:rkey(r)};}).sort(roomSort);
+    $("resCount").textContent=residents.length;
+    $("resList").innerHTML=sorted.length?sorted.map(function(r){
+      return '<div class="mini" data-key="'+escapeHtml(r.key)+'"><span class="room">'+escapeHtml(String(r.room))+'</span><span class="name">'+escapeHtml(r.name||"")+'</span><button class="edit" data-edit="'+escapeHtml(r.key)+'">Edit</button><button class="del" data-del="'+escapeHtml(r.key)+'">Remove</button></div>';
+    }).join(""):'<p class="hint">No residents in the local list.</p>';
+
+    var todayN=0,days={};
+    boardings.forEach(function(b){if(b.date===TODAY)todayN++;days[b.date]=days[b.date]||{Breakfast:0,Lunch:0,Dinner:0};if(days[b.date][b.meal]!=null)days[b.date][b.meal]++;});
+    $("statToday").textContent=todayN;$("statTotal").textContent=boardings.length;
+    var dayKeys=Object.keys(days).sort().reverse().slice(0,14);
+    $("dayList").innerHTML=dayKeys.length?dayKeys.map(function(d){
+      return '<div class="day-row"><span class="d">'+prettyDate(new Date(d+"T00:00:00"))+'</span><span class="n">B '+days[d].Breakfast+' · L '+days[d].Lunch+' · D '+days[d].Dinner+'</span></div>';
+    }).join(""):'<p class="hint">No records on this tablet yet.</p>';
+
+    $("setName").value=settings.name||"";
+    $("setPin").value=settings.pin||"";
+    $("setUrl").value=settings.syncUrl||"";
+    $("setSecret").value=settings.secret||"";
+  }
+
+  $("resAdd").onclick=function(){
+    var room=$("resRoom").value.trim(),name=$("resName").value.trim();
+    if(!room){$("resRoom").focus();return;}
+    residents.push({id:uid(),room:room,name:name});save(K.res,residents);
+    $("resRoom").value="";$("resName").value="";refreshAdmin();render();$("resRoom").focus();
+  };
+  $("resList").addEventListener("click",function(e){
+    var del=e.target.getAttribute("data-del"),ed=e.target.getAttribute("data-edit");
+    if(del){if(confirm("Remove from the local list? Past records are kept.")){residents=residents.filter(function(r){return rkey(r)!==del;});save(K.res,residents);refreshAdmin();render();}}
+    if(ed){
+      var r=residents.filter(function(x){return rkey(x)===ed;})[0];if(!r)return;
+      var nr=prompt("Room number:",r.room);if(nr===null)return;
+      var nn=prompt("Name:",r.name||"");if(nn===null)return;
+      r.room=nr.trim();r.name=nn.trim();save(K.res,residents);refreshAdmin();render();
+    }
+  });
+
+  function parseBulk(){
+    return $("bulkText").value.split("\n").map(function(line){
+      line=line.trim();if(!line)return null;
+      var parts=line.split(/[,;\t]| {2,}/);var room=(parts[0]||"").trim();var name=parts.slice(1).join(" ").trim();
+      if(!name){var m=line.match(/^(\S+)\s+(.*)$/);if(m){room=m[1];name=m[2];}}
+      if(!room)return null;return {id:uid(),room:room,name:name};
+    }).filter(Boolean);
+  }
+  $("bulkAdd").onclick=function(){var add=parseBulk();if(!add.length){alert("Nothing to add — use: room, name");return;}residents=residents.concat(add);save(K.res,residents);$("bulkText").value="";refreshAdmin();render();alert("Added "+add.length+".");};
+  $("bulkReplace").onclick=function(){var nu=parseBulk();if(!nu.length){alert("Nothing to load — use: room, name");return;}if(!confirm("Replace the local list with these "+nu.length+" entries?"))return;residents=nu;save(K.res,residents);$("bulkText").value="";refreshAdmin();render();alert("List replaced.");};
+
+  $("exportBtn").onclick=function(){
+    var rows=[["EventId","Date","Meal","Room","Name","Added","Time"]];
+    boardings.slice().sort(function(a,b){return (a.ts||"")<(b.ts||"")?-1:1;}).forEach(function(b){
+      var t=new Date(b.ts);var tm=isNaN(t)?"":t.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+      rows.push([b.date+"|"+b.meal+"|"+b.key,b.date,b.meal,b.room,b.name||"",b.adhoc?"yes":"",tm]);
+    });
+    var csv=rows.map(function(r){return r.map(function(c){c=String(c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(",");}).join("\r\n");
+    var blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8;"});var url=URL.createObjectURL(blob);
+    var a=document.createElement("a");a.href=url;a.download="meals-"+TODAY+".csv";document.body.appendChild(a);a.click();
+    setTimeout(function(){URL.revokeObjectURL(url);a.remove();},500);
+  };
+  $("clearLogBtn").onclick=function(){if(!confirm("Clear the local copy on this tablet? The Google Sheet is not affected."))return;boardings=[];save(K.log,boardings);refreshAdmin();render();};
+
+  $("testConn").onclick=function(){
+    SYNC.url=$("setUrl").value.trim();SYNC.secret=$("setSecret").value.trim();
+    $("syncMsg").textContent="Testing…";$("syncMsg").style.color="var(--ink-soft)";
+    fetchResidents(function(ok,msg){$("syncMsg").style.color=ok?"var(--go-ink)":"var(--warn)";$("syncMsg").textContent=(ok?"✓ Connected — ":"✕ ")+msg;});
+  };
+  $("refreshRes").onclick=function(){
+    SYNC.url=$("setUrl").value.trim();SYNC.secret=$("setSecret").value.trim();
+    fetchResidents(function(ok,msg){$("syncMsg").style.color=ok?"var(--go-ink)":"var(--warn)";$("syncMsg").textContent=(ok?"✓ ":"✕ ")+msg;});
+  };
+  $("setSave").onclick=function(){
+    settings.name=$("setName").value.trim()||"Meals Attendance";
+    var p=$("setPin").value.trim();if(p)settings.pin=p;
+    settings.syncUrl=$("setUrl").value.trim();settings.secret=$("setSecret").value.trim();
+    save(K.set,settings);
+    SYNC.url=settings.syncUrl;SYNC.secret=settings.secret;
+    refreshAdmin();render();
+    if(SYNC.url){fetchResidents();flush();}else setSync("off");
+    alert("Settings saved.");
+  };
+
+  function openSheet(s){s.classList.add("show");}
+  function closeSheets(){document.querySelectorAll(".scrim").forEach(function(s){s.classList.remove("show");});}
+  document.querySelectorAll("[data-close]").forEach(function(b){b.onclick=closeSheets;});
+  document.querySelectorAll(".scrim").forEach(function(s){s.addEventListener("click",function(e){if(e.target===s)closeSheets();});});
+
+  render();
+  if(SYNC.url){setSync(queue.length?"saving":"synced");fetchResidents();flush();}else setSync("off");
+})();
+</script>
+</body>
+</html>
