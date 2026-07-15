@@ -42,6 +42,10 @@
   .search::placeholder{color:#9AA6A9;}
   .search:focus{outline:3px solid var(--focus);outline-offset:1px;border-color:var(--focus);}
 
+  .floors{display:flex;gap:8px;overflow-x:auto;padding-top:10px;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+  .floors::-webkit-scrollbar{display:none;}
+  .chip{flex:0 0 auto;min-height:44px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line);background:var(--surface);font-size:15px;font-weight:700;color:var(--ink-soft);cursor:pointer;white-space:nowrap;}
+  .chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
   .list{padding:0 16px 140px;display:flex;flex-direction:column;gap:8px;}
   .row{display:flex;align-items:center;gap:14px;min-height:var(--tap);background:var(--surface);border:1.5px solid var(--line);border-radius:var(--radius);padding:10px 14px;cursor:pointer;user-select:none;transition:background .12s,border-color .12s,transform .06s;}
   .row:active{transform:scale(.992);}
@@ -140,6 +144,7 @@
 
   <div class="searchwrap">
     <input class="search" id="search" inputmode="search" placeholder="Search room number or name…" autocomplete="off">
+    <div class="floors" id="floorwrap" style="display:none;"></div>
   </div>
 
   <div class="list" id="list"></div>
@@ -222,6 +227,10 @@
         <div class="field"><label>Centre / service name</label><input id="setName" placeholder="e.g. Carnbeg Centre meals"></div>
         <div class="field"><label>Staff PIN</label><input id="setPin" inputmode="numeric" placeholder="4 digits"></div>
 
+        <h3>Floor buttons (optional)</h3>
+        <p class="hint">One per line as <strong>Label: start-end</strong>, e.g. <em>Floor 1: 100-120</em>. Leave blank to auto-group by hundreds.</p>
+        <div class="field"><textarea id="setFloors" placeholder="Ground: 100-120&#10;First: 121-140&#10;Second: 200-240"></textarea></div>
+
         <h3>Cloud sync (Google Sheet)</h3>
         <p class="hint">Paste the Web app URL from your meals Apps Script deployment and the same secret.</p>
         <div class="field"><label>Web app URL</label><input id="setUrl" placeholder="https://script.google.com/macros/s/…/exec"></div>
@@ -247,7 +256,7 @@
   var residents=load(K.res,[]);
   var boardings=load(K.log,[]);
   var queue=load(K.queue,[]);
-  var settings=load(K.set,{name:"Meals Attendance",pin:"1379",syncUrl:"",secret:""});
+  var settings=load(K.set,{name:"Meals Attendance",pin:"1379",syncUrl:"",secret:"",floors:""});
   var SYNC={url:settings.syncUrl||"",secret:settings.secret||""};
   function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 
@@ -258,7 +267,45 @@
   var TODAY=todayKey();
 
   var $=function(id){return document.getElementById(id);};
-  var listEl=$("list"),searchEl=$("search"),currentRows=[];
+  var listEl=$("list"),searchEl=$("search"),currentRows=[],floorSel=null;
+
+  function parseFloors(){
+    var cfg=(settings.floors||"").trim(),out=[];
+    if(cfg){
+      cfg.split("\n").forEach(function(line){
+        line=line.trim();if(!line)return;
+        var label=line,range=line,ci=line.indexOf(":");
+        if(ci>=0){label=line.slice(0,ci).trim();range=line.slice(ci+1).trim();}
+        var m=range.match(/(\d+)\s*[-–]\s*(\d+)/);
+        if(m)out.push({label:label,min:parseInt(m[1],10),max:parseInt(m[2],10)});
+      });
+    }else{
+      var buckets={};
+      residents.forEach(function(r){var n=parseInt(String(r.room).replace(/\D/g,""),10);if(!isNaN(n))buckets[Math.floor(n/100)*100]=true;});
+      Object.keys(buckets).map(Number).sort(function(a,b){return a-b;}).forEach(function(h){out.push({label:h+"s",min:h,max:h+99});});
+    }
+    return out;
+  }
+  function renderFloors(){
+    var floors=parseFloors(),wrap=$("floorwrap");
+    if(floors.length<2){wrap.style.display="none";wrap.innerHTML="";return;}
+    wrap.style.display="flex";
+    var html='<button class="chip" data-all="1">All</button>';
+    floors.forEach(function(f){html+='<button class="chip" data-min="'+f.min+'" data-max="'+f.max+'">'+escapeHtml(f.label)+'</button>';});
+    wrap.innerHTML=html;
+    var chips=wrap.querySelectorAll(".chip");chips.forEach(function(x){x.classList.remove("active");});
+    var matched=null;
+    if(floorSel)chips.forEach(function(x){if(x.dataset.min!=null&&+x.dataset.min===floorSel.min&&+x.dataset.max===floorSel.max)matched=x;});
+    (matched||wrap.querySelector('[data-all]')).classList.add("active");
+    if(!matched)floorSel=null;
+  }
+  document.getElementById("floorwrap").addEventListener("click",function(e){
+    var c=e.target.closest(".chip");if(!c)return;
+    this.querySelectorAll(".chip").forEach(function(x){x.classList.remove("active");});
+    c.classList.add("active");
+    floorSel=c.dataset.all?null:{min:+c.dataset.min,max:+c.dataset.max};
+    render();
+  });
 
   function rkey(r){
     if(r.key) return r.key;
@@ -321,7 +368,7 @@
     fetch(url).then(function(r){return r.json();}).then(function(res){
       if(res&&res.ok&&Array.isArray(res.residents)){
         residents=res.residents.map(function(x){return {room:String(x.room),name:x.name||"",ref:x.ref||""};});
-        save(K.res,residents);render();refreshAdmin();cb&&cb(true,res.residents.length+" residents loaded");
+        save(K.res,residents);render();renderFloors();refreshAdmin();cb&&cb(true,res.residents.length+" residents loaded");
       }else cb&&cb(false,(res&&res.error)||"Unexpected response");
     }).catch(function(e){cb&&cb(false,"Could not reach the Sheet");});
   }
@@ -350,6 +397,7 @@
     });
     rows.sort(roomSort);
 
+    if(floorSel)rows=rows.filter(function(r){var n=parseInt(String(r.room).replace(/\D/g,""),10);return !isNaN(n)&&n>=floorSel.min&&n<=floorSel.max;});
     var q=searchEl.value.trim().toLowerCase();
     if(q)rows=rows.filter(function(r){return String(r.room).toLowerCase().indexOf(q)>=0||String(r.name||"").toLowerCase().indexOf(q)>=0;});
     $("clearSearchBtn").style.display=q?"flex":"none";
@@ -436,6 +484,7 @@
 
     $("setName").value=settings.name||"";
     $("setPin").value=settings.pin||"";
+    $("setFloors").value=settings.floors||"";
     $("setUrl").value=settings.syncUrl||"";
     $("setSecret").value=settings.secret||"";
   }
@@ -493,10 +542,11 @@
   $("setSave").onclick=function(){
     settings.name=$("setName").value.trim()||"Meals Attendance";
     var p=$("setPin").value.trim();if(p)settings.pin=p;
+    settings.floors=$("setFloors").value;
     settings.syncUrl=$("setUrl").value.trim();settings.secret=$("setSecret").value.trim();
     save(K.set,settings);
     SYNC.url=settings.syncUrl;SYNC.secret=settings.secret;
-    refreshAdmin();render();
+    refreshAdmin();render();renderFloors();
     if(SYNC.url){fetchResidents();flush();}else setSync("off");
     alert("Settings saved.");
   };
@@ -506,7 +556,7 @@
   document.querySelectorAll("[data-close]").forEach(function(b){b.onclick=closeSheets;});
   document.querySelectorAll(".scrim").forEach(function(s){s.addEventListener("click",function(e){if(e.target===s)closeSheets();});});
 
-  render();
+  render();renderFloors();
   if(SYNC.url){setSync(queue.length?"saving":"synced");fetchResidents();flush();}else setSync("off");
 })();
 </script>
